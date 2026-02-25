@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Crystal Ultra | v6.0 Maximize Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --glass: rgba(15, 15, 15, 0.85);
+            --border: rgba(255, 255, 255, 0.1);
+            --glow: #4285f4; 
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            height: 100%; width: 100%;
+            font-family: 'Inter', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        #ambient-bg {
+            position: fixed; top: 0; left: 0; z-index: -1;
+            width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 10%, #1a1c2c 0%, #000 100%);
+        }
+
+        .app-shell {
+            display: flex; flex-direction: column;
+            height: 100vh; padding: 15px; box-sizing: border-box;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Mode Fullscreen / Besarkan */
+        .app-shell.maximized { padding: 0; }
+        .app-shell.maximized .nav-bar, 
+        .app-shell.maximized .engine-tabs, 
+        .app-shell.maximized footer { display: none; }
+        .app-shell.maximized .view-port { border-radius: 0; border: none; }
+
+        /* Tabs */
+        .engine-tabs { display: flex; gap: 5px; padding-left: 10px; }
+        .tab {
+            padding: 10px 30px; font-size: 10px; font-weight: 800;
+            letter-spacing: 2px; border-radius: 12px 12px 0 0;
+            cursor: pointer; border: 1px solid var(--border);
+            border-bottom: none; background: rgba(255,255,255,0.02);
+            color: #444; transition: 0.3s;
+        }
+        .tab.active[data-engine="google"] { background: var(--glass); color: #4285f4; border-top: 3px solid #4285f4; }
+        .tab.active[data-engine="chrome"] { background: var(--glass); color: #ea4335; border-top: 3px solid #ea4335; }
+
+        /* Navbar */
+        .nav-bar {
+            display: flex; align-items: center;
+            padding: 12px 20px; background: var(--glass);
+            backdrop-filter: blur(40px); border: 1px solid var(--border);
+            border-radius: 0 15px 15px 15px; gap: 15px; margin-bottom: 15px;
+        }
+
+        .input-wrapper {
+            flex-grow: 1; display: flex; align-items: center;
+            background: rgba(255,255,255,0.03); padding: 8px 15px; border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        input { background: transparent; border: none; color: #fff; width: 100%; outline: none; font-size: 13px; }
+
+        .btn {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            color: #888; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+            font-size: 10px; font-weight: 700; transition: 0.3s;
+        }
+
+        /* Viewport & Controls */
+        .view-port {
+            flex-grow: 1; background: #fff; border-radius: 20px;
+            overflow: hidden; border: 1px solid var(--border);
+            position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.9);
+        }
+
+        iframe, video, img { width: 100%; height: 100%; border: none; display: none; object-fit: contain; }
+        .active-media { display: block !important; }
+
+        /* Tombol Besarkan (Kanan Bawah) */
+        .maximize-btn {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 45px; height: 45px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 100;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            transition: 0.3s;
+        }
+        .maximize-btn:hover { transform: scale(1.1); background: var(--glow); }
+        .maximize-btn svg { fill: #fff; width: 20px; }
+
+        footer { padding: 10px; display: flex; justify-content: space-between; font-size: 9px; color: #444; }
+        #loader-line { position: absolute; bottom: 0; left: 0; height: 2px; width: 0%; background: var(--glow); transition: 0.5s; }
+    </style>
+</head>
+<body>
+
+<div id="ambient-bg"></div>
+
+<div class="app-shell" id="app-shell">
+    <div class="engine-tabs">
+        <div class="tab active" data-engine="google" onclick="setEngine('google')">GOOGLE</div>
+        <div class="tab" data-engine="chrome" onclick="setEngine('chrome')">CHROME</div>
+    </div>
+
+    <header class="nav-bar">
+        <div style="cursor:pointer;" onclick="location.reload()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </div>
+        <div class="input-wrapper">
+            <input type="text" id="main-input" placeholder="Search or enter secure URL...">
+        </div>
+        <button id="edit-node" class="btn" onclick="toggleEdit()">EDIT NODE</button>
+        <button class="btn" onclick="capture()">SNAP</button>
+        <div id="loader-line"></div>
+    </header>
+
+    <main class="view-port" id="render-zone">
+        <iframe id="web-frame" src="https://www.google.com/search?igu=1" class="active-media"></iframe>
+        <video id="video-player" controls></video>
+        <img id="image-viewer">
+
+        <div class="maximize-btn" onclick="toggleMaximize()" title="Besarkan">
+            <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        </div>
+    </main>
+
+    <footer>
+        <div id="log">SYSTEM: READY // MODE: GOOGLE</div>
+        <div>X-CRYSTAL v6.0</div>
+    </footer>
+</div>
+
+<script>
+    const shell = document.getElementById('app-shell');
+    const input = document.getElementById('main-input');
+    const frame = document.getElementById('web-frame');
+    const loader = document.getElementById('loader-line');
+    const log = document.getElementById('log');
+
+    let isMaximized = false;
+
+    function toggleMaximize() {
+        isMaximized = !isMaximized;
+        if(isMaximized) {
+            shell.classList.add('maximized');
+            log.innerText = "SYSTEM: VIEWPORT_MAXIMIZED";
+        } else {
+            shell.classList.remove('maximized');
+            log.innerText = "SYSTEM: VIEWPORT_RESTORED";
+        }
+    }
+
+    function setEngine(engine) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[data-engine="${engine}"]`).classList.add('active');
+        loader.style.width = '100%';
+
+        if(engine === 'google') {
+            document.documentElement.style.setProperty('--glow', '#4285f4');
+            frame.src = "https://www.google.com/search?igu=1";
+            log.innerText = "SYSTEM: ENGINE_GOOGLE_LOADED";
+        } else {
+            document.documentElement.style.setProperty('--glow', '#ea4335');
+            frame.src = "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://www.google.com/chrome/");
+            log.innerText = "SYSTEM: ENGINE_CHROME_LOADED";
+        }
+        setTimeout(() => { loader.style.width = '0%'; }, 600);
+    }
+
+    // Tombol ESC untuk keluar dari mode besarkan
+    document.addEventListener('keydown', (e) => {
+        if (e.key === "Escape" && isMaximized) toggleMaximize();
+    });
+
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const val = input.value.trim();
+            if(!val) return;
+            loader.style.width = '100%';
+            let target = (val.includes('.') && !val.includes(' ')) ? (val.startsWith('http') ? val : 'https://' + val) : `https://www.google.com/search?q=${encodeURIComponent(val)}&igu=1`;
+            frame.src = (target.includes('google.com')) ? target : "https://api.allorigins.win/raw?url=" + encodeURIComponent(target);
+            setTimeout(() => { loader.style.width = '0%'; }, 800);
+        }
+    });
+
+    function toggleEdit() {
+        try {
+            frame.contentDocument.designMode = (frame.contentDocument.designMode === "on") ? "off" : "on";
+            document.getElementById('edit-node').style.background = (frame.contentDocument.designMode === "on") ? "#ff4757" : "";
+        } catch(e) { alert("Akses Ditolak. Gunakan Live Server!"); }
+    }
+
+    function capture() {
+        html2canvas(document.getElementById('render-zone')).then(canvas => {
+            const a = document.createElement('a');
+            a.download = `CRYSTAL-SNAP-${Date.now()}.png`;
+            a.href = canvas.toDataURL();
+            a.click();
+        });
+    }
+</script>
+</body>
+</html>
